@@ -6,6 +6,7 @@ use termion::terminal_size;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 use termion::raw::RawTerminal;
+use termion::color;
 use std::io::{Write, stdout, stdin};
 
 struct Position{
@@ -67,6 +68,38 @@ struct Bitmap{
     h: i32,
 }
 
+fn fill_color(intensity: i32){
+    let color = 8;
+    let chars = 5;
+    match (intensity%(color*chars))/chars{
+        0 => print!("{}{}", color::Bg(color::Black)     , color::Fg(color::Blue)      ,),
+        1 => print!("{}{}", color::Bg(color::Blue)      , color::Fg(color::LightBlue) ,),
+        2 => print!("{}{}", color::Bg(color::LightBlue) , color::Fg(color::LightCyan) ,),
+        3 => print!("{}{}", color::Bg(color::LightCyan) , color::Fg(color::LightWhite),),
+        4 => print!("{}{}", color::Bg(color::LightWhite), color::Fg(color::LightCyan) ,),
+        5 => print!("{}{}", color::Bg(color::LightCyan) , color::Fg(color::LightBlue) ,),
+        6 => print!("{}{}", color::Bg(color::LightBlue) , color::Fg(color::Blue)      ,),
+        7 => print!("{}{}", color::Bg(color::Blue)      , color::Fg(color::Black)     ,),
+        _ => {},
+    }
+
+    match (intensity%(color*chars))%chars{
+        /*
+        0 => print!("{}", "."),
+        1 => print!("{}", "x"),
+        2 => print!("{}", "%"),
+        3 => print!("{}", "#"),
+        4 => print!("{}", "@"),
+        */
+        0 => print!(" "),
+        1 => print!("{}", char::from_u32(0x2591).unwrap()),
+        2 => print!("{}", char::from_u32(0x2592).unwrap()),
+        3 => print!("{}", char::from_u32(0x2593).unwrap()),
+        4 => print!("{}", char::from_u32(0x2593).unwrap()),
+        _ => {},
+    }
+}
+
 impl Bitmap{
     fn new(width: i32, height: i32) -> Bitmap{
         let bitmap : Vec<i32> = vec![0; (width*height) as usize];
@@ -79,7 +112,6 @@ impl Bitmap{
     }
 
     fn display(&self){
-        let block = char::from_u32(0x2588).unwrap();
         let mut it = 0;
         for line in self.bitmap.chunks(self.w as usize){
             if it != 0{
@@ -87,12 +119,12 @@ impl Bitmap{
             }
 
             for pixel in line.iter(){
-                if pixel % 3 == 1{
-                    print!("{}", block);
-                }else{
-                    print!(" ")
+                match pixel{
+                    -1 => print!("{}{} ", color::Fg(color::White), color::Bg(color::Black)),
+                    _ => fill_color(*pixel),
                 }
             }
+
             print!("\r");
             it += 1;
         }
@@ -128,9 +160,9 @@ impl Bitmap{
                     z = z.sq().add(&c)
                 }
 
-                let mut g = 1;
+                let mut g = (z.len()*100.0) as i32;
                 if f64::is_nan(z.len()) {
-                    g = 0;
+                    g = -1;
                 }
 
                 self.set(j as i32, i as i32, g);
@@ -152,7 +184,9 @@ fn display_all(stdout: &mut RawTerminal<std::io::Stdout>, bitmap: &mut Bitmap, h
     bitmap.display();
 
     if *help{
-        print!("{}pos:{},{}-{}\r\n", termion::cursor::Goto(1,1), pos.x, pos.y, pos.z);
+        print!("{}", termion::cursor::Goto(1,1));
+        print!("{}{} ", color::Fg(color::White), color::Bg(color::Black));
+        print!("pos:{},{}-{}\r\n", pos.x, pos.y, pos.z);
         print!("? - Open this message\r\n");
         print!("Arrows- Move Slower\r\n");
         print!("wasd  - Move\r\n");
