@@ -181,6 +181,8 @@ fn main() {
     let mut help = true;
     let mut pos: Position = Position { x: 0.0, y: 0.0, z: 0.0 };
 
+    display_all(&mut stdout, &mut bitmap, &help, &pos);
+
     for event in stdin.keys(){
         let zoom: f64 = f64::exp(-pos.z);
 
