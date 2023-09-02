@@ -109,7 +109,7 @@ impl Bitmap{
         }
     }
 
-    fn fill_madelbrot(&mut self, pos: &Position){
+    fn fill_madelbrot(&mut self, pos: &Position, complexity: &i32){
         for i in 0..self.h {
             for j in 0..self.w {
                 let aspect_x = (self.w as f64 / self.h as f64) * 1.0;
@@ -124,7 +124,7 @@ impl Bitmap{
                     x: aspect_x * x,
                     y: aspect_y * y,
                 };
-                for _it in 0..1000{
+                for _it in 0..complexity*100{
                     z = z.sq().add(&c)
                 }
 
@@ -144,11 +144,11 @@ impl Bitmap{
     }
 }
 
-fn display_all(stdout: &mut RawTerminal<std::io::Stdout>, bitmap: &mut Bitmap, help: &bool, pos: &Position){
+fn display_all(stdout: &mut RawTerminal<std::io::Stdout>, bitmap: &mut Bitmap, help: &bool, pos: &Position, complexity: &i32){
     print!("{}", termion::cursor::Goto(1,1));
     stdout.flush().unwrap();
 
-    bitmap.fill_madelbrot(pos);
+    bitmap.fill_madelbrot(pos, complexity);
     bitmap.display();
 
     if *help{
@@ -158,6 +158,7 @@ fn display_all(stdout: &mut RawTerminal<std::io::Stdout>, bitmap: &mut Bitmap, h
         print!("wasd  - Move\r\n");
         print!("WASD  - Move Faster\r\n");
         print!("+-    - Zoom\r\n");
+        print!("()    - Depth {}\r\n", complexity);
         print!("q     - Quit\r\n");
     }
 
@@ -180,8 +181,9 @@ fn main() {
 
     let mut help = true;
     let mut pos: Position = Position { x: 0.0, y: 0.0, z: 0.0 };
+    let mut complexity: i32 = 7;
 
-    display_all(&mut stdout, &mut bitmap, &help, &pos);
+    display_all(&mut stdout, &mut bitmap, &help, &pos, &complexity);
 
     for event in stdin.keys(){
         let zoom: f64 = f64::exp(-pos.z);
@@ -201,6 +203,8 @@ fn main() {
                 Key::Char('a')=> pos.x -= 0.1 * zoom,
                 Key::Char('d')=> pos.x += 0.1 * zoom,
                 Key::Char('-')=> pos.z -= 0.2,
+                Key::Char(')')=> complexity += 1,
+                Key::Char('(')=> complexity -= 1,
                 Key::Char('+')=> pos.z += 0.2,
                 Key::Char('?')=> help = !help,
                 Key::Ctrl('c') => break,
@@ -210,7 +214,7 @@ fn main() {
             _ => break,
         }
 
-        display_all(&mut stdout, &mut bitmap, &help, &pos);
+        display_all(&mut stdout, &mut bitmap, &help, &pos, &complexity);
     }
 
     stdout.suspend_raw_mode().unwrap();
