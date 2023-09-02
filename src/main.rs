@@ -1,6 +1,9 @@
 extern crate termion;
 
+use std::thread;
+use std::time::Duration;
 use std::ops;
+use termion::async_stdin;
 use termion::event::Key;
 use termion::terminal_size;
 use termion::input::TermRead;
@@ -233,7 +236,7 @@ fn display_all(stdout: &mut RawTerminal<std::io::Stdout>, bitmap: &mut Bitmap, h
     stdout.flush().unwrap();
 }
 
-fn main() {
+fn start() {
     let term_size = terminal_size().unwrap();
     let mut bitmap: Bitmap = Bitmap::new(term_size.0 as i32, term_size.1 as i32);
 
@@ -288,4 +291,37 @@ fn main() {
     }
 
     stdout.suspend_raw_mode().unwrap();
+}
+
+fn main_async(){
+    let mut stdin = async_stdin().keys();
+    let mut stdout: RawTerminal<std::io::Stdout> = stdout().into_raw_mode().unwrap();
+
+    loop {
+        match stdin.next() {
+            Some(result) => match result{
+                Ok(key) => match key{
+                    Key::Char('q') => {
+                        print!("Quitting");
+                        break;
+                    },
+                    key => {
+                        print!("Key pressed: {:?}", key);
+                    }
+                },
+                _ => {},
+            },
+            _ => {}
+        }
+
+        stdout.flush().unwrap();
+
+        thread::sleep(Duration::from_millis(20));
+    }
+
+    stdout.suspend_raw_mode().unwrap();
+}
+
+fn main(){
+    start();
 }
