@@ -66,6 +66,7 @@ struct Bitmap{
     bitmap: Vec<i32>,
     w: i32,
     h: i32,
+    mode: i32,
 }
 
 fn fill_color(intensity: i32){
@@ -92,10 +93,10 @@ fn fill_color(intensity: i32){
         4 => print!("{}", "@"),
         */
         0 => print!(" "),
-        1 => print!("{}", char::from_u32(0x2591).unwrap()),
-        2 => print!("{}", char::from_u32(0x2592).unwrap()),
-        3 => print!("{}", char::from_u32(0x2593).unwrap()),
-        4 => print!("{}", char::from_u32(0x2593).unwrap()),
+        1 => print!("{}", '\u{2591}'),
+        2 => print!("{}", '\u{2592}'),
+        3 => print!("{}", '\u{2593}'),
+        4 => print!("{}", '\u{2593}'),
         _ => {},
     }
 }
@@ -108,10 +109,41 @@ impl Bitmap{
             bitmap,
             w: width,
             h: height,
+            mode: 1,
         }
     }
 
     fn display(&self){
+        match self.mode{
+            1 => self.display_color(),
+            _ => self.display_outline(),
+        }
+    }
+
+    fn set_mode(&mut self, mode: i32){
+        self.mode = mode;
+    }
+
+    fn display_outline(&self){
+        let mut it = 0;
+        for line in self.bitmap.chunks(self.w as usize){
+            if it != 0{
+                print!("\n");
+            }
+
+            for pixel in line.iter(){
+                match pixel{
+                    -1 => print!("{}{} ", color::Fg(color::White), color::Bg(color::Black)),
+                    _ => print!("{}", '\u{2593}'),
+                }
+            }
+
+            print!("\r");
+            it += 1;
+        }
+    }
+
+    fn display_color(&self){
         let mut it = 0;
         for line in self.bitmap.chunks(self.w as usize){
             if it != 0{
@@ -193,6 +225,8 @@ fn display_all(stdout: &mut RawTerminal<std::io::Stdout>, bitmap: &mut Bitmap, h
         print!("WASD  - Move Faster\r\n");
         print!("+-    - Zoom\r\n");
         print!("()    - Depth {}\r\n", complexity);
+        print!("1     - Color mode\r\n");
+        print!("2     - Outline mode\r\n");
         print!("q     - Quit\r\n");
     }
 
@@ -239,6 +273,8 @@ fn main() {
                 Key::Char('-')=> pos.z -= 0.2,
                 Key::Char(')')=> complexity += 1,
                 Key::Char('(')=> complexity -= 1,
+                Key::Char('1')=> bitmap.set_mode(1),
+                Key::Char('2')=> bitmap.set_mode(2),
                 Key::Char('+')=> pos.z += 0.2,
                 Key::Char('?')=> help = !help,
                 Key::Ctrl('c') => break,
