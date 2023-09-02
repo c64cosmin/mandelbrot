@@ -2,13 +2,14 @@ extern crate termion;
 
 use std::ops;
 use termion::event::Key;
+use termion::terminal_size;
 use termion::input::TermRead;
 use termion::raw::IntoRawMode;
 use std::io::{Write, stdout, stdin};
 
 struct Complex{
-    x: f32,
-    y: f32,
+    x: f64,
+    y: f64,
 }
 
 impl ops::Add for Complex{
@@ -34,7 +35,7 @@ impl ops::Mul for Complex{
 }
 
 impl Complex{
-    fn len(&self) -> f32{
+    fn len(&self) -> f64{
         (self.x*self.x+self.y*self.y).sqrt()
     }
 
@@ -55,8 +56,8 @@ impl Complex{
 
 struct Bitmap{
     bitmap: Vec<i32>,
-    width: i32,
-    height: i32,
+    w: i32,
+    h: i32,
 }
 
 impl Bitmap{
@@ -65,49 +66,57 @@ impl Bitmap{
 
         Bitmap{
             bitmap,
-            width,
-            height,
+            w: width,
+            h: height,
         }
     }
 
     fn display(&self){
-        for line in self.bitmap.chunks(self.width as usize){
+        let block = char::from_u32(0x2588).unwrap();
+        for line in self.bitmap.chunks(self.w as usize){
             for pixel in line.iter(){
                 if pixel % 3 == 1{
-                    print!("x")
+                    print!("{}", block);
                 }else{
                     print!(" ")
                 }
             }
-            println!("");
+            print!("\r\n");
         }
     }
 
     fn fill_circle(&mut self){
-        for i in 0..self.height {
-            for j in 0..self.width {
-                let x: i32 = j - self.width / 2;
-                let y: i32 = i - self.height / 2;
-                let g: i32 = ((x*x+y*y) as f32).sqrt() as i32;
+        for i in 0..self.h {
+            for j in 0..self.w {
+                let x: i32 = j - self.w / 2;
+                let y: i32 = i - self.h / 2;
+                let g: i32 = ((x*x+y*y) as f64).sqrt() as i32;
                 self.set(j as i32, i as i32, g);
             }
         }
     }
 
-    fn fill_madelbrot(&mut self, x_pos: i32, y_pos: i32){
-        for i in 0..self.height {
-            for j in 0..self.width {
-                let x: f32 = (j - self.width / 2 + x_pos) as f32 / self.width as f32 - 0.3;
-                let y: f32 = (i - self.height / 2 + y_pos) as f32 / self.height as f32;
-                let zoom: f32 = 2.0;
+    fn fill_madelbrot(&mut self, x_pos: f64, y_pos: f64, z_pos: f64){
+        for i in 0..self.h {
+            for j in 0..self.w {
+                let aspect_x = (self.w as f64 / self.h as f64) * 1.0;
+                let aspect_y = 2.0;
+                let zoom: f64 = f64::exp(-z_pos);
+                let pixel_x: f64 = (j - self.w / 2) as f64 / self.w as f64;
+                let pixel_y: f64 = (i - self.h / 2) as f64 / self.h as f64;
+                let x: f64 = zoom * pixel_x + x_pos;
+                let y: f64 = zoom * pixel_y + y_pos;
                 let mut z = Complex{x: 0.0, y: 0.0};
-                let c = Complex{x: x*zoom, y: y*zoom};
+                let c = Complex{
+                    x: aspect_x * x,
+                    y: aspect_y * y,
+                };
                 for _it in 0..1000{
                     z = z.sq().add(&c)
                 }
 
                 let mut g = 1;
-                if f32::is_nan(z.len()) {
+                if f64::is_nan(z.len()) {
                     g = 0;
                 }
 
@@ -117,13 +126,14 @@ impl Bitmap{
     }
 
     fn set(&mut self, x:i32, y:i32, v: i32){
-        let i = y*self.width + x;
+        let i = y*self.w + x;
         self.bitmap[i as usize] = v;
     }
 }
 
 fn main() {
-    let mut bitmap: Bitmap = Bitmap::new(70, 40);
+    let term_size = terminal_size().unwrap();
+    let mut bitmap: Bitmap = Bitmap::new(term_size.0 as i32, term_size.1 as i32);
 
     bitmap.fill_circle();
     bitmap.display();
@@ -133,16 +143,39 @@ fn main() {
     let stdin = stdin();
     let mut stdout = stdout().into_raw_mode().unwrap();
 
-    let mut pos_x = 0;
-    let mut pos_y = 0;
+    stdout.activate_raw_mode().unwrap();
+
+    let mut pos_x: f64 = 0.0;
+    let mut pos_y: f64 = 0.0;
+    let mut pos_z: f64 = 0.0;
+
+    print!("{}{}", termion::cursor::Goto(1,1), termion::clear::All);
+    stdout.flush().unwrap();
+
+    bitmap.fill_madelbrot(pos_x, pos_y, pos_z);
+    bitmap.display();
+
+    stdout.flush().unwrap();
 
     for event in stdin.keys(){
+        let zoom: f64 = f64::exp(-pos_z);
+
         match event{
             Ok(key) => match key{
-                Key::Up => pos_y -= 1,
-                Key::Down => pos_y += 1,
-                Key::Left => pos_x -= 1,
-                Key::Right => pos_x += 1,
+                Key::Up => pos_y -= 0.1 * zoom,
+                Key::Down => pos_y += 0.1 * zoom,
+                Key::Left => pos_x -= 0.1 * zoom,
+                Key::Right => pos_x += 0.1 * zoom,
+                Key::Char('W')=> pos_y -= 1.0 * zoom,
+                Key::Char('S')=> pos_y += 1.0 * zoom,
+                Key::Char('A')=> pos_x -= 1.0 * zoom,
+                Key::Char('D')=> pos_x += 1.0 * zoom,
+                Key::Char('w')=> pos_y -= 0.1 * zoom,
+                Key::Char('s')=> pos_y += 0.1 * zoom,
+                Key::Char('a')=> pos_x -= 0.1 * zoom,
+                Key::Char('d')=> pos_x += 0.1 * zoom,
+                Key::Char('-')=> pos_z -= 0.2,
+                Key::Char('+')=> pos_z += 0.2,
                 Key::Ctrl('c') => break,
                 Key::Char('q') => break,
                 _ => {}
@@ -150,12 +183,14 @@ fn main() {
             _ => break,
         }
 
-        bitmap.fill_madelbrot(pos_x, pos_y);
+        print!("{}", termion::cursor::Goto(1,1));
+        stdout.flush().unwrap();
+
+        bitmap.fill_madelbrot(pos_x, pos_y, pos_z);
         bitmap.display();
 
         stdout.flush().unwrap();
     }
 
-    write!(stdout, "{}", termion::cursor::Show).unwrap();
-    stdout.flush().unwrap();
+    stdout.suspend_raw_mode().unwrap();
 }
