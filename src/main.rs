@@ -237,8 +237,8 @@ fn main() {
     let term_size = terminal_size().unwrap();
     let mut bitmap: Bitmap = Bitmap::new(term_size.0 as i32, term_size.1 as i32);
 
-    bitmap.fill_circle();
-    bitmap.display();
+    //bitmap.fill_circle();
+    //bitmap.display();
 
     println!("");
 
