@@ -1,4 +1,10 @@
+extern crate termion;
+
 use std::ops;
+use termion::event::Key;
+use termion::input::TermRead;
+use termion::raw::IntoRawMode;
+use std::io::{Write, stdout, stdin};
 
 struct Complex{
     x: f32,
@@ -55,8 +61,7 @@ struct Bitmap{
 
 impl Bitmap{
     fn new(width: i32, height: i32) -> Bitmap{
-        let mut bitmap : Vec<i32> = Vec::new();
-        bitmap.resize((width*height) as usize, 0);
+        let bitmap : Vec<i32> = vec![0; (width*height) as usize];
 
         Bitmap{
             bitmap,
@@ -89,11 +94,11 @@ impl Bitmap{
         }
     }
 
-    fn fill_madelbrot(&mut self){
+    fn fill_madelbrot(&mut self, x_pos: i32, y_pos: i32){
         for i in 0..self.height {
             for j in 0..self.width {
-                let x: f32 = (j - self.width / 2) as f32 / self.width as f32 - 0.3;
-                let y: f32 = (i - self.height / 2) as f32 / self.height as f32;
+                let x: f32 = (j - self.width / 2 + x_pos) as f32 / self.width as f32 - 0.3;
+                let y: f32 = (i - self.height / 2 + y_pos) as f32 / self.height as f32;
                 let zoom: f32 = 2.0;
                 let mut z = Complex{x: 0.0, y: 0.0};
                 let c = Complex{x: x*zoom, y: y*zoom};
@@ -125,8 +130,32 @@ fn main() {
 
     println!("");
 
-    bitmap.fill_madelbrot();
-    bitmap.display();
+    let stdin = stdin();
+    let mut stdout = stdout().into_raw_mode().unwrap();
 
-    println!("");
+    let mut pos_x = 0;
+    let mut pos_y = 0;
+
+    for event in stdin.keys(){
+        match event{
+            Ok(key) => match key{
+                Key::Up => pos_y -= 1,
+                Key::Down => pos_y += 1,
+                Key::Left => pos_x -= 1,
+                Key::Right => pos_x += 1,
+                Key::Ctrl('c') => break,
+                Key::Char('q') => break,
+                _ => {}
+            },
+            _ => break,
+        }
+
+        bitmap.fill_madelbrot(pos_x, pos_y);
+        bitmap.display();
+
+        stdout.flush().unwrap();
+    }
+
+    write!(stdout, "{}", termion::cursor::Show).unwrap();
+    stdout.flush().unwrap();
 }
